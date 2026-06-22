@@ -1,3 +1,4 @@
+// file: src/App.jsx
 import React, { useEffect, useState } from "react";
 import AuthPage from "./components/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -17,19 +18,12 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = (userName) => {
-    setUser({
-      displayName: userName,
-    });
-  };
-
   const handleLogout = async () => {
     try {
       await signOut(auth);
     } catch (error) {
       console.error("Logout Error:", error);
     }
-
     setUser(null);
   };
 
@@ -41,14 +35,12 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    return <AuthPage onLoginSuccess={handleLogin} />;
+  // SECURITY GATE: Must have a user AND their email must be verified
+  if (!user || (user && !user.emailVerified)) {
+    return <AuthPage user={user} />;
   }
 
   return (
-    <Dashboard
-      user={user}
-      onLogout={handleLogout}
-    />
+    <Dashboard user={user} onLogout={handleLogout} />
   );
 }
