@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from "react";
 import Sidebar from "../components/Sidebar";
 import AddTradeModal from "../components/AddTradeModal";
-import { TrendingUp, Flame } from "lucide-react";
+import { TrendingUp, Flame, ChevronDown } from "lucide-react"; // Added ChevronDown
 import { useTrades } from "../context/TradeContext";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 
@@ -19,21 +19,33 @@ const formatPnl = (val) => {
 
 // --- INTERNAL COMPONENT: VYRO SCORE ---
 const VyroScore = ({ trades }) => {
+  if (!trades || trades.length === 0) {
+    return (
+      <div className="relative overflow-hidden bg-white/[0.03] border border-white/[0.06] rounded-3xl p-6 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.45)] h-full flex flex-col items-center justify-center text-center">
+        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+        <h2 className="text-xl font-bold text-white mb-4 absolute top-6 left-6">Vyro Score</h2>
+        <div className="h-20 w-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4">
+          <TrendingUp size={32} className="text-slate-600" />
+        </div>
+        <p className="text-slate-500 font-bold text-sm">No trade data yet</p>
+        <p className="text-slate-600 text-xs mt-1">Log a trade to calculate your score</p>
+      </div>
+    );
+  }
+
   const wins = trades.filter((t) => t.win).length;
   const winRate = trades.length > 0 ? (wins / trades.length) * 100 : 0;
-
   const grossProfit = trades.filter((t) => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0);
   const grossLoss = Math.abs(trades.filter((t) => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0));
   const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 5 : 0;
-
   const avgRR = trades.length > 0 ? trades.reduce((acc, t) => acc + Math.abs(t.rrr), 0) / trades.length : 0;
 
   const data = [
     { metric: "Win Rate", value: Math.min(winRate * 1.5, 100) },
     { metric: "Profit", value: Math.min(profitFactor * 20, 100) },
     { metric: "Avg RR", value: Math.min(avgRR * 25, 100) },
-    { metric: "Recovery", value: 85 },
-    { metric: "Drawdown", value: 78 },
+    { metric: "Recovery", value: 85 }, 
+    { metric: "Drawdown", value: 78 }, 
     { metric: "Consistency", value: 88 },
   ];
 
@@ -202,22 +214,27 @@ const TradingCalendar = ({ trades }) => {
 
 // --- MAIN COMPONENT: DASHBOARD ---
 export default function Dashboard({ user, onLogout, activePage, onNavigate }) {
-  const { trades, addTrade } = useTrades();
+  const { trades, addTrade, accounts, activeAccountId, setActiveAccountId } = useTrades();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false); // Custom dropdown state
 
-  const handleSaveTrade = (tradeData) => {
-    addTrade(tradeData);
+  const handleSaveTrade = async (tradeData) => {
+    await addTrade(tradeData);
     setIsModalOpen(false);
   };
 
+  // FILTER TRADES BY ACTIVE ACCOUNT
+  const accountTrades = trades.filter(t => t.account_id === activeAccountId);
+  const activeAccount = accounts.find(a => a.id === activeAccountId);
+
   // CALCULATIONS
-  const netPnl = trades.reduce((acc, t) => acc + t.pnl, 0);
-  const wins = trades.filter((t) => t.win).length;
-  const losses = trades.length - wins;
-  const winRate = trades.length > 0 ? (wins / trades.length) * 100 : 0;
+  const netPnl = accountTrades.reduce((acc, t) => acc + t.pnl, 0);
+  const wins = accountTrades.filter((t) => t.win).length;
+  const losses = accountTrades.length - wins;
+  const winRate = accountTrades.length > 0 ? (wins / accountTrades.length) * 100 : 0;
   
   // Current Winning Streak Logic
-  const sortedTrades = [...trades].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const sortedTrades = [...accountTrades].sort((a, b) => new Date(a.date) - new Date(b.date));
   let currentStreak = 0;
   if (sortedTrades.length > 0) {
     for (let i = sortedTrades.length - 1; i >= 0; i--) {
@@ -229,12 +246,12 @@ export default function Dashboard({ user, onLogout, activePage, onNavigate }) {
     }
   }
 
-  const recentTrades = [...trades].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
+  const recentTrades = [...accountTrades].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
 
   const stats = [
     { title: "Net P&L", value: `$${netPnl.toLocaleString()}`, type: "trend", isPositive: netPnl >= 0 },
     { title: "Win Rate", value: `${winRate.toFixed(1)}%`, type: "ring", winRate: winRate },
-    { title: "Total Trades", value: trades.length, type: "bars", wins, losses },
+    { title: "Total Trades", value: accountTrades.length, type: "bars", wins, losses },
     { title: "Current Streak", value: currentStreak, type: "streak" },
   ];
 
@@ -246,13 +263,58 @@ export default function Dashboard({ user, onLogout, activePage, onNavigate }) {
       <Sidebar activePage={activePage} onNavigate={onNavigate} onAddTradeClick={() => setIsModalOpen(true)} />
 
       <main className="flex-1 p-8 overflow-y-auto relative z-10 premium-scroll">
-        {/* Premium Header */}
+        {/* Premium Header with Custom Account Switcher */}
         <div className="flex items-center justify-between mb-12 animate-fade-in-up">
           <div>
             <h1 className="text-5xl font-black tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent drop-shadow-lg">
               Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00df73] to-[#00ff85] drop-shadow-[0_0_15px_rgba(0,223,115,0.4)]">{user?.displayName?.split(" ")[0] || "Trader"}</span>
             </h1>
             <p className="text-slate-400 mt-3 text-lg font-medium">Your trading performance at a glance.</p>
+          </div>
+          
+          {/* Custom Premium Account Dropdown */}
+          <div className="relative">
+            <button 
+              onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
+              className="relative bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl rounded-2xl px-5 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.45)] min-w-[220px] flex items-center justify-between gap-4 hover:border-emerald-500/20 transition-all z-10"
+            >
+              <div className="text-left">
+                <label className="text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold block mb-1">Active Account</label>
+                <p className="text-white font-bold text-sm truncate">
+                  {activeAccount?.name || "Select"} <span className="text-slate-500 font-medium">({activeAccount?.type})</span>
+                </p>
+              </div>
+              <ChevronDown size={18} className={`text-slate-400 transition-transform duration-300 ${isAccountDropdownOpen ? 'rotate-180 text-emerald-400' : ''}`} />
+            </button>
+
+            {isAccountDropdownOpen && (
+              <>
+                {/* Invisible Backdrop to close dropdown on outside click */}
+                <div className="fixed inset-0 z-10" onClick={() => setIsAccountDropdownOpen(false)}></div>
+                
+                {/* Custom Dropdown Menu */}
+                <div className="absolute top-full mt-2 right-0 w-full min-w-[220px] bg-[#040812]/95 border border-white/[0.08] backdrop-blur-2xl rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] overflow-hidden z-20 animate-fade-in-up">
+                  {accounts.map(acc => (
+                    <button
+                      key={acc.id}
+                      onClick={() => { 
+                        setActiveAccountId(acc.id); 
+                        setIsAccountDropdownOpen(false); 
+                      }}
+                      className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-emerald-500/10 transition-colors group border-b border-white/[0.03] last:border-b-0 ${acc.id === activeAccountId ? 'bg-white/[0.02]' : ''}`}
+                    >
+                      <div>
+                        <p className={`font-bold text-sm ${acc.id === activeAccountId ? 'text-emerald-400' : 'text-white group-hover:text-emerald-400'}`}>{acc.name}</p>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">{acc.type} • ${acc.size.toLocaleString()}</p>
+                      </div>
+                      {acc.id === activeAccountId && (
+                        <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#00df73]"></div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -288,8 +350,8 @@ export default function Dashboard({ user, onLogout, activePage, onNavigate }) {
                         <span className="text-red-400 text-[10px] font-bold">{stat.losses}L</span>
                       </div>
                       <div className="h-1.5 bg-white/10 rounded-full overflow-hidden flex">
-                        <div className="h-full bg-emerald-400" style={{ width: `${(stat.wins / (stat.wins + stat.losses)) * 100}%` }} />
-                        <div className="h-full bg-red-400" style={{ width: `${(stat.losses / (stat.wins + stat.losses)) * 100}%` }} />
+                        <div className="h-full bg-emerald-400" style={{ width: `${stat.wins + stat.losses > 0 ? (stat.wins / (stat.wins + stat.losses)) * 100 : 0}%` }} />
+                        <div className="h-full bg-red-400" style={{ width: `${stat.wins + stat.losses > 0 ? (stat.losses / (stat.wins + stat.losses)) * 100 : 0}%` }} />
                       </div>
                     </div>
                   )}
@@ -312,7 +374,7 @@ export default function Dashboard({ user, onLogout, activePage, onNavigate }) {
           
           <div className="col-span-12 xl:col-span-4 flex flex-col gap-6 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
             <div className="h-[550px]">
-              <VyroScore trades={trades} />
+              <VyroScore trades={accountTrades} />
             </div>
 
             <div className="h-[350px] relative overflow-hidden bg-white/[0.03] border border-white/[0.06] rounded-3xl p-6 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.45)] flex flex-col">
@@ -325,29 +387,34 @@ export default function Dashboard({ user, onLogout, activePage, onNavigate }) {
               </div>
 
               <div className="space-y-3 relative z-10 overflow-y-auto premium-scroll pr-2 h-full">
-                {recentTrades.map((trade) => (
-                  <div key={trade.id} className="flex justify-between items-center p-3 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-emerald-500/20 hover:bg-white/[0.04] transition-all duration-300 group">
-                    <div className="flex items-center gap-3">
-                      <div className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs ${trade.pnl > 0 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
-                        {trade.pair.substring(0, 2)}
-                      </div>
-                      <div>
-                        <p className="font-bold text-white text-sm group-hover:text-emerald-400 transition-colors">{trade.pair}</p>
-                        {/* Updated to show Strategy instead of Side */}
-                        <p className="text-[10px] text-slate-500 mt-0.5 font-medium">{trade.strategy} • {new Date(trade.date).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <p className={`font-black text-sm ${trade.pnl > 0 ? "text-emerald-400" : "text-red-400"}`}>
-                        {trade.pnl > 0 ? "+" : "-"}${Math.abs(trade.pnl).toLocaleString()}
-                      </p>
-                      <p className="text-[9px] text-slate-500 mt-0.5 uppercase tracking-wider font-bold">
-                        {trade.rrr > 0 ? `+${trade.rrr}R` : `${trade.rrr}R`}
-                      </p>
-                    </div>
+                {accountTrades.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-center">
+                    <p className="text-slate-600 text-sm">No trades logged yet.</p>
                   </div>
-                ))}
+                ) : (
+                  recentTrades.map((trade) => (
+                    <div key={trade.id} className="flex justify-between items-center p-3 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-emerald-500/20 hover:bg-white/[0.04] transition-all duration-300 group">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs ${trade.pnl > 0 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
+                          {trade.pair.substring(0, 2)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-white text-sm group-hover:text-emerald-400 transition-colors">{trade.pair}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5 font-medium">{trade.strategy} • {new Date(trade.date).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <p className={`font-black text-sm ${trade.pnl > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                          {trade.pnl > 0 ? "+" : "-"}${Math.abs(trade.pnl).toLocaleString()}
+                        </p>
+                        <p className="text-[9px] text-slate-500 mt-0.5 uppercase tracking-wider font-bold">
+                          {trade.rrr > 0 ? `+${trade.rrr}R` : `${trade.rrr}R`}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -356,7 +423,7 @@ export default function Dashboard({ user, onLogout, activePage, onNavigate }) {
             <div className="relative overflow-hidden bg-white/[0.03] border border-white/[0.06] rounded-3xl p-6 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.45)] h-[924px]">
               <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
               <div className="absolute -top-10 -right-10 h-32 w-32 bg-emerald-500/10 rounded-full blur-3xl" />
-              <TradingCalendar trades={trades} />
+              <TradingCalendar trades={accountTrades} />
             </div>
           </div>
         </div>

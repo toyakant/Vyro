@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import AuthPage from "./components/Auth";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
+import Trades from "./pages/Trades"; // <-- ADDED: Import Trades page
 import { auth } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
@@ -46,6 +47,11 @@ export default function App() {
   // PAGE ROUTER
   if (currentPage === "Settings") {
     return <Settings user={user} onLogout={handleLogout} activePage={currentPage} onNavigate={setCurrentPage} />;
+  }
+
+  // ADDED: Trades Route
+  if (currentPage === "Trades") {
+    return <Trades activePage={currentPage} onNavigate={setCurrentPage} />;
   }
 
   return <Dashboard user={user} onLogout={handleLogout} activePage={currentPage} onNavigate={setCurrentPage} />;

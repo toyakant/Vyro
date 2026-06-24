@@ -1,46 +1,144 @@
 // file: src/context/TradeContext.jsx
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "../supabase";
 
 const TradeContext = createContext();
 
-// Generate some mock trades for the CURRENT month so the calendar has data
-const currentYear = new Date().getFullYear();
-const currentMonth = new Date().getMonth(); // 0-11
-
-const mockTrades = [
-  { id: "1", date: new Date(currentYear, currentMonth, 2), pair: "EURUSD", side: "Long", pnl: 7060, rrr: 2.1, win: true, strategy: "Breakout", emotion: "Calm", notes: "Perfect execution on the London open." },
-  { id: "2", date: new Date(currentYear, currentMonth, 3), pair: "NQ", side: "Short", pnl: -6400, rrr: -1, win: false, strategy: "Reversal", emotion: "FOMO", notes: "Chased the entry, should have waited for confirmation." },
-  { id: "3", date: new Date(currentYear, currentMonth, 4), pair: "XAUUSD", side: "Long", pnl: -1810, rrr: -1, win: false, strategy: "Scalp", emotion: "Anxious", notes: "Stop loss was too tight." },
-  { id: "4", date: new Date(currentYear, currentMonth, 5), pair: "GBPUSD", side: "Long", pnl: -7990, rrr: -1.5, win: false, strategy: "Breakout", emotion: "Revenge", notes: "Revenge traded after the previous loss." },
-  { id: "5", date: new Date(currentYear, currentMonth, 6), pair: "USDCAD", side: "Short", pnl: 9700, rrr: 3.2, win: true, strategy: "Order Block", emotion: "Confident", notes: "Great order block retest." },
-  { id: "6", date: new Date(currentYear, currentMonth, 9), pair: "EURUSD", side: "Short", pnl: 1750, rrr: 1.5, win: true, strategy: "Trend Continuation", emotion: "Calm", notes: "Followed the plan exactly." },
-  { id: "7", date: new Date(currentYear, currentMonth, 10), pair: "ES", side: "Long", pnl: 12300, rrr: 4.1, win: true, strategy: "Order Block", emotion: "Confident", notes: "Held through the pullback, paid off." },
-  { id: "8", date: new Date(currentYear, currentMonth, 11), pair: "BTCUSD", side: "Long", pnl: 9890, rrr: 2.8, win: true, strategy: "Breakout", emotion: "Calm", notes: "Clean breakout retest." },
-  { id: "9", date: new Date(currentYear, currentMonth, 12), pair: "XAUUSD", side: "Short", pnl: -7910, rrr: -1, win: false, strategy: "Reversal", emotion: "Anxious", notes: "Counter-trend trade failed." },
-  { id: "10", date: new Date(currentYear, currentMonth, 13), pair: "NQ", side: "Short", pnl: -6910, rrr: -1, win: false, strategy: "Scalp", emotion: "FOMO", notes: "FOMOed into the top." },
-  { id: "11", date: new Date(currentYear, currentMonth, 16), pair: "EURUSD", side: "Long", pnl: 3470, rrr: 1.8, win: true, strategy: "Trend Continuation", emotion: "Calm", notes: "Good trend follow." },
-  { id: "12", date: new Date(currentYear, currentMonth, 17), pair: "GBPUSD", side: "Short", pnl: 906, rrr: 1.2, win: true, strategy: "Scalp", emotion: "Confident", notes: "Quick scalp." },
-  { id: "13", date: new Date(currentYear, currentMonth, 18), pair: "ES", side: "Long", pnl: 12900, rrr: 3.5, win: true, strategy: "Breakout", emotion: "Calm", notes: "Strong momentum." },
-  { id: "14", date: new Date(currentYear, currentMonth, 19), pair: "USDCAD", side: "Long", pnl: -213, rrr: -0.5, win: false, strategy: "Reversal", emotion: "Anxious", notes: "Choppy market." },
-  { id: "15", date: new Date(currentYear, currentMonth, 20), pair: "XAUUSD", side: "Short", pnl: 4250, rrr: 2.0, win: true, strategy: "Order Block", emotion: "Confident", notes: "Solid rejection." },
-  { id: "16", date: new Date(currentYear, currentMonth, 23), pair: "BTCUSD", side: "Short", pnl: 1430, rrr: 1.4, win: true, strategy: "Trend Continuation", emotion: "Calm", notes: "Lower high formed." },
-  { id: "17", date: new Date(currentYear, currentMonth, 24), pair: "NQ", side: "Long", pnl: -9260, rrr: -1.5, win: false, strategy: "Breakout", emotion: "FOMO", notes: "Bull trap." },
-  { id: "18", date: new Date(currentYear, currentMonth, 25), pair: "EURUSD", side: "Short", pnl: -9650, rrr: -1, win: false, strategy: "Scalp", emotion: "Revenge", notes: "Overleveraged." },
-  { id: "19", date: new Date(currentYear, currentMonth, 26), pair: "ES", side: "Short", pnl: 4970, rrr: 2.2, win: true, strategy: "Reversal", emotion: "Calm", notes: "Great call." },
-  { id: "20", date: new Date(currentYear, currentMonth, 27), pair: "XAUUSD", side: "Long", pnl: 2580, rrr: 1.9, win: true, strategy: "Order Block", emotion: "Confident", notes: "Support held." },
-  { id: "21", date: new Date(currentYear, currentMonth, 30), pair: "GBPUSD", side: "Long", pnl: 2680, rrr: 2.5, win: true, strategy: "Trend Continuation", emotion: "Calm", notes: "End of month push." },
-];
-
 export function TradeProvider({ children }) {
-  const [trades, setTrades] = useState(mockTrades);
+  const [trades, setTrades] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [activeAccountId, setActiveAccountId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const addTrade = (trade) => {
-    const newTrade = { ...trade, id: crypto.randomUUID() };
-    setTrades((prev) => [newTrade, ...prev]);
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: accData } = await supabase.from("accounts").select("*");
+      if (accData && accData.length > 0) {
+        setAccounts(accData);
+        setActiveAccountId(accData[0].id);
+      }
+
+      const { data: tradeData } = await supabase.from("trades").select("*");
+      if (tradeData) {
+        const formattedTrades = tradeData.map(t => ({ 
+          ...t, 
+          date: new Date(t.date),
+          setupRating: t.setup_rating
+        }));
+        setTrades(formattedTrades);
+      }
+
+      setLoading(false);
+    };
+
+    fetchData();
+
+    const tradeChannel = supabase
+      .channel("public:trades")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "trades" }, (payload) => {
+        setTrades((prev) => [{ ...payload.new, date: new Date(payload.new.date), setupRating: payload.new.setup_rating }, ...prev]);
+      })
+      .subscribe();
+
+    const accountChannel = supabase
+      .channel("public:accounts")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "accounts" }, (payload) => {
+        setAccounts((prev) => [...prev, payload.new]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tradeChannel);
+      supabase.removeChannel(accountChannel);
+    };
+  }, []);
+
+  const addTrade = async (trade) => {
+    const { data, error } = await supabase.from("trades").insert([{
+      account_id: activeAccountId,
+      pair: trade.pair,
+      side: trade.side,
+      pnl: trade.pnl,
+      rrr: trade.rrr,
+      win: trade.win,
+      date: trade.date,
+      strategy: trade.strategy,
+      tags: trade.tags,
+      emotions: trade.emotions,
+      execution: trade.execution,
+      setup_rating: trade.setupRating,
+      notes: trade.notes,
+      screenshots: trade.screenshots,
+      timeframe: trade.timeframe,
+      session: trade.session,
+    }]).select();
+
+    if (error) {
+      console.error("Supabase Insert Error:", error);
+      alert("Error saving trade: " + error.message);
+    } else if (data) {
+      setTrades((prev) => [{ ...data[0], date: new Date(data[0].date), setupRating: data[0].setup_rating }, ...prev]);
+    }
+  };
+
+  // NEW: Update Trade
+  const updateTrade = async (id, updatedData) => {
+    const { data, error } = await supabase.from("trades").update({
+      pair: updatedData.pair,
+      side: updatedData.side,
+      pnl: updatedData.pnl,
+      rrr: updatedData.rrr,
+      win: updatedData.win,
+      date: updatedData.date,
+      strategy: updatedData.strategy,
+      tags: updatedData.tags,
+      emotions: updatedData.emotions,
+      execution: updatedData.execution,
+      setup_rating: updatedData.setupRating,
+      notes: updatedData.notes,
+      screenshots: updatedData.screenshots,
+      timeframe: updatedData.timeframe,
+      session: updatedData.session,
+      account_id: activeAccountId
+    }).eq("id", id).select();
+
+    if (error) {
+      console.error("Supabase Update Error:", error);
+      alert("Error updating trade: " + error.message);
+    } else if (data) {
+      setTrades(prev => prev.map(t => t.id === id ? { ...data[0], date: new Date(data[0].date), setupRating: data[0].setup_rating } : t));
+    }
+  };
+
+  // NEW: Delete Trade
+  const deleteTrade = async (id) => {
+    const { error } = await supabase.from("trades").delete().eq("id", id);
+    if (error) {
+      console.error("Supabase Delete Error:", error);
+      alert("Error deleting trade: " + error.message);
+    } else {
+      setTrades(prev => prev.filter(t => t.id !== id));
+    }
+  };
+
+  const addAccount = async (account) => {
+    const { data, error } = await supabase.from("accounts").insert([
+      { name: account.name, size: account.size, type: account.type }
+    ]).select();
+
+    if (error) {
+      console.error("Error saving account:", error);
+      alert("Error saving account: " + error.message);
+    } else if (data) {
+      setAccounts((prev) => [...prev, data[0]]);
+      setActiveAccountId(data[0].id);
+    }
   };
 
   return (
-    <TradeContext.Provider value={{ trades, addTrade }}>
+    <TradeContext.Provider 
+      value={{ trades, addTrade, updateTrade, deleteTrade, accounts, activeAccountId, setActiveAccountId, addAccount, loading }}
+    >
       {children}
     </TradeContext.Provider>
   );
