@@ -140,25 +140,6 @@ Automatically sync trades from supported brokers without manual entry.
 | ⏳      | Mobile Support     |
 
 ---
-
-# ⚙️ Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/vyro.git
-
-# Navigate to project
-cd vyro
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
----
-
 # 🌟 Why Vyro?
 
 Unlike a traditional trading journal, Vyro focuses on helping traders improve through analytics, discipline, and automation.
@@ -175,18 +156,16 @@ into one seamless experience.
 
 ---
 
-# 🤝 Contributing
+# 📄 License
 
-Contributions, feature suggestions, and feedback are always welcome.
-
-Feel free to fork the project and submit a pull request.
+This project is intended for educational and portfolio purposes.
 
 ---
 
 <div align="center">
 
-### ⭐ If you like this project, consider giving it a star!
+## 👨‍💻 Author
 
-Built with ❤️ by **Toyakant**
+### **Toyakant Chaudhary**
 
-</div>
+*"Building secure, scalable, and modern web applications."*
